@@ -1,0 +1,29 @@
+# Gitignore for Flutter + Rust project
+
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.pub-cache/
+.pub/
+/build/
+ui/build/
+ui/.dart_tool/
+*.log
+
+# Rust
+target/
+core/target/
+**/*.rs.bk
+Cargo.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large binaries
+*.pdb
+*.zip
+*.apk
+*.exe
+*.dll

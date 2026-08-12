@@ -1,0 +1,18 @@
+# Cargo target toolchain configurations for cross-compilation
+
+[target.aarch64-linux-android]
+# Point to standard Android NDK toolchain compiler.
+# In a real environment, set NDK_HOME and path to toolchain binaries.
+linker = "aarch64-linux-android33-clang"
+
+[target.armv7-linux-androideabi]
+linker = "armv7-linux-androideabi33-clang"
+
+[target.aarch64-apple-ios]
+# Link iOS frameworks and define static library compilation configurations
+rustflags = [
+    "-C", "link-arg=-framework", 
+    "-C", "link-arg=CoreFoundation",
+    "-C", "link-arg=-framework",
+    "-C", "link-arg=UIKit"
+]

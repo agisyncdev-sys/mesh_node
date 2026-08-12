@@ -1,0 +1,16 @@
+syntax = "proto3";
+package ring_allreduce;
+
+service RingNode {
+  rpc PassPayload (Payload) returns (Empty);
+}
+
+message Payload {
+  string originator_id = 1;
+  uint32 step = 2;
+  repeated float tensor_data = 3;
+  bytes zk_proof = 4;
+  bytes zk_inputs = 5;
+}
+
+message Empty {}

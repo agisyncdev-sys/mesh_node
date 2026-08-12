@@ -1,0 +1,50 @@
+[package]
+name = "mesh_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"] # Required for Flutter FFI and internal bin
+
+[dependencies]
+# FFI Binding Generator
+flutter_rust_bridge = "=2.12.0" # Standard for Flutter-Rust FFI
+
+# Async Runtime
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+once_cell = "1.19"
+
+# Networking (Decentralized Mesh)
+libp2p = { version = "0.53", features = ["tcp", "noise", "yamux", "ping", "mdns", "gossipsub", "macros", "tokio", "kad", "identify", "autonat", "request-response"] }
+
+# Cryptography
+ed25519-dalek = "2.0"       # High-speed signature system
+rand = "0.8"                # Secure random number generation
+
+# AI Inference — ONNX Runtime via `ort` (load-dynamic links to pre-built ORT 1.17.1 DLL at runtime)
+# api-17 locks the API surface to ORT 1.17.x; default-features=false drops the download-binaries feature
+ort = { version = "=2.0.0-rc.13", default-features = false, features = ["load-dynamic", "api-17", "std", "ndarray"] }
+ndarray = "0.17"            # N-dimensional array for tensor manipulation (MeshTensor.to_ndarray)
+# Zero-Knowledge Proofs (Halo2)
+halo2_proofs = "0.3.0"
+ff = "0.13.0"
+group = "0.13.0"
+rand_core = "0.6.4"
+
+# Stream handling for libp2p swarm
+futures = "0.3"
+
+# gRPC dependencies for Ring All-Reduce
+tonic = "0.11"
+prost = "0.12"
+memory-stats = "1.2.0"
+
+[build-dependencies]
+flutter_rust_bridge_codegen = "2.0"
+tonic-build = "0.11"
+
+[features]
+coreml = []
+nnapi = []
+directml = []

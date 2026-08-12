@@ -1,0 +1,5 @@
+rust_root: "core"
+dart_root: "ui"
+rust_input: "crate::api"
+dart_output: "ui/lib/src/rust/api.dart"
+c_output: "core/src/frb_generated.h"
