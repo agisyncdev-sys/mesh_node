@@ -8,7 +8,7 @@ set(PROJECT_NAME "rust_lib_mesh_ui")
 project(${PROJECT_NAME} LANGUAGES CXX)
 
 include("../cargokit/cmake/cargokit.cmake")
-apply_cargokit(${PROJECT_NAME} ../../core mesh_core "")
+apply_cargokit(${PROJECT_NAME} ../../core rust_lib_mesh_ui "")
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an

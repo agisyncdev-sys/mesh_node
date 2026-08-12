@@ -52,5 +52,5 @@ android {
 apply from: "../cargokit/gradle/plugin.gradle"
 cargokit {
     manifestDir = "../../core"
-    libname = "mesh_core"
+    libname = "rust_lib_mesh_ui"
 }

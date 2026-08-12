@@ -1,5 +1,5 @@
 [package]
-name = "mesh_core"
+name = "rust_lib_mesh_ui"
 version = "0.1.0"
 edition = "2021"
 
