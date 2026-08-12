@@ -75,7 +75,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
-    stem: 'mesh_core',
+    stem: 'rust_lib_mesh_ui',
     ioDirectory: '../core/target/release/',
     webPrefix: 'pkg/',
     wasmBindgenName: 'wasm_bindgen',
