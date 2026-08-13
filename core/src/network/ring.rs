@@ -57,6 +57,7 @@ impl ProtoRingNode for RingNodeServerImpl {
                 "Node [{}] completed Ring All-Reduce! Ring size: {}.",
                 self.state.node_id, self.state.ring_size
             );
+            crate::api::emit_aggregated_result(payload.tensor_data.clone());
             let guard = self.state.completion_tx.lock().await;
             if let Some(tx) = guard.as_ref() {
                 let _ = tx.send(payload.clone());

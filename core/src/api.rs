@@ -79,8 +79,14 @@ pub fn peer_discovery_stream(sink: StreamSink<String>) {
     PEER_SINK.set(sink).ok();
 }
 
+pub(crate) fn emit_aggregated_result(data: Vec<f32>) {
+    if let Some(sink) = AGGREGATED_RESULT_SINK.get() {
+        let _ = sink.add(data);
+    }
+}
+
 pub fn execute_inference(prompt: String) -> String {
-    let _engine = InferenceEngine::new("minimal.onnx").unwrap();
+    let _engine = InferenceEngine::new().unwrap();
     format!("AI output for '{}': OK. Accelerated via ONNX.", prompt)
 }
 
@@ -121,7 +127,7 @@ pub fn connect_to_peer(peer_addr: String) -> bool {
 }
 
 pub fn send_prompt(originator_id: String, prompt: String, next_peer_addr: String) -> String {
-    let mut engine = match InferenceEngine::new("minimal.onnx") {
+    let mut engine = match InferenceEngine::new() {
         Ok(eng) => eng,
         Err(e) => return format!("Failed to load ONNX model: {}", e),
     };
@@ -142,17 +148,6 @@ pub fn send_prompt(originator_id: String, prompt: String, next_peer_addr: String
     
     let rt = RUNTIME.get_or_init(|| Runtime::new().unwrap());
     rt.spawn(async move {
-        // We spawn a task to wait for the completion_tx if this is the originator
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        
-        let state = RingNodeState {
-            node_id: originator_id.clone(),
-            listen_addr: "127.0.0.1:0".to_string(), // Dummy, not a real server for this temporary injection
-            next_peer_addr: next_peer_addr.clone(),
-            ring_size: 3, // Assuming fixed size for this demo, or should get from config
-            completion_tx: Arc::new(tokio::sync::Mutex::new(Some(tx))),
-        };
-
         let payload = Payload {
             originator_id,
             step: 1, // First step in sequence
@@ -161,12 +156,6 @@ pub fn send_prompt(originator_id: String, prompt: String, next_peer_addr: String
             zk_inputs,
         };
         let _ = forward_to_peer(&next_peer_addr, payload).await;
-        
-        if let Some(final_payload) = rx.recv().await {
-            if let Some(sink) = AGGREGATED_RESULT_SINK.get() {
-                let _ = sink.add(final_payload.tensor_data);
-            }
-        }
     });
 
     local_result

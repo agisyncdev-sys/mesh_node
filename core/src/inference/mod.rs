@@ -21,20 +21,19 @@ pub struct InferenceEngine {
 }
 
 impl InferenceEngine {
-    /// Load an ONNX model from `model_path` and open an inference session.
-    ///
-    /// `ort` uses `ORT_DYLIB_PATH` (emitted by `build.rs`) to locate
-    /// `onnxruntime.dll` via `LoadLibrary` at runtime.
-    pub fn new(model_path: &str) -> Result<Self, Box<dyn Error>> {
+    /// Load the bundled ONNX model and open an inference session.
+    pub fn new() -> Result<Self, Box<dyn Error>> {
         // init() returns bool (true = first init, false = already done). No ? needed.
         ort::init()
             .with_name("mesh_core")
             .commit();
 
+        let model_bytes = include_bytes!("../../minimal.onnx");
+
         // Build the session with 1 intra-op thread — lightweight for edge/mobile.
         let session = Session::builder()?
             .with_intra_threads(1)?
-            .commit_from_file(Path::new(model_path))?;
+            .commit_from_memory(model_bytes)?;
 
         // .inputs() / .outputs() are methods in rc.13, not public fields.
         let input_name = session
@@ -52,8 +51,8 @@ impl InferenceEngine {
             .to_string();
 
         println!(
-            "[InferenceEngine] ONNX Runtime loaded. Model: {}\n  Input : [{}]\n  Output: [{}]",
-            model_path, input_name, output_name
+            "[InferenceEngine] ONNX Runtime loaded from bundled memory. \n  Input : [{}]\n  Output: [{}]",
+            input_name, output_name
         );
 
         Ok(Self { session, input_name, output_name })
@@ -110,7 +109,7 @@ mod tests {
     /// The model is an Identity node (opset 18) so output must equal input exactly.
     #[test]
     fn test_inference_forward_pass() {
-        let mut engine = InferenceEngine::new("minimal.onnx")
+        let mut engine = InferenceEngine::new()
             .expect("Failed to initialise InferenceEngine with minimal.onnx");
 
         engine.print_model_info();
@@ -134,7 +133,7 @@ mod tests {
     /// Verifies multi-element batches work correctly with the Identity model.
     #[test]
     fn test_batch_forward_pass() {
-        let mut engine = InferenceEngine::new("minimal.onnx")
+        let mut engine = InferenceEngine::new()
             .expect("Failed to initialise InferenceEngine");
 
         // Batch of 4 scalar embeddings packed as [4, 1].
