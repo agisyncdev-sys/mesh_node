@@ -179,8 +179,8 @@ mod tests {
         // Node 1 configuration
         let state1 = RingNodeState {
             node_id: "Node-1".to_string(),
-            listen_addr: "127.0.0.1:50061".to_string(),
-            next_peer_addr: "127.0.0.1:50062".to_string(),
+            listen_addr: "127.0.0.1:50161".to_string(),
+            next_peer_addr: "127.0.0.1:50162".to_string(),
             ring_size: 3,
             completion_tx: Arc::new(Mutex::new(Some(tx1))),
         };
@@ -188,8 +188,8 @@ mod tests {
         // Node 2 configuration
         let state2 = RingNodeState {
             node_id: "Node-2".to_string(),
-            listen_addr: "127.0.0.1:50062".to_string(),
-            next_peer_addr: "127.0.0.1:50063".to_string(),
+            listen_addr: "127.0.0.1:50162".to_string(),
+            next_peer_addr: "127.0.0.1:50163".to_string(),
             ring_size: 3,
             completion_tx: Arc::new(Mutex::new(None)),
         };
@@ -197,8 +197,8 @@ mod tests {
         // Node 3 configuration
         let state3 = RingNodeState {
             node_id: "Node-3".to_string(),
-            listen_addr: "127.0.0.1:50063".to_string(),
-            next_peer_addr: "127.0.0.1:50061".to_string(),
+            listen_addr: "127.0.0.1:50163".to_string(),
+            next_peer_addr: "127.0.0.1:50161".to_string(),
             ring_size: 3,
             completion_tx: Arc::new(Mutex::new(None)),
         };
@@ -235,7 +235,7 @@ mod tests {
         };
 
         // Trigger the Ring All-Reduce by calling pass_payload on Node-1 itself
-        let mut client1 = RingNodeClient::connect("http://127.0.0.1:50061").await.unwrap();
+        let mut client1 = RingNodeClient::connect("http://127.0.0.1:50161").await.unwrap();
         let forward_res = client1.pass_payload(Request::new(initial_payload)).await;
         assert!(forward_res.is_ok(), "Initial payload injection to Node-1 failed: {:?}", forward_res);
 
