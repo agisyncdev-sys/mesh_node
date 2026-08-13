@@ -127,22 +127,10 @@ pub fn connect_to_peer(peer_addr: String) -> bool {
 }
 
 pub fn send_prompt(originator_id: String, prompt: String, next_peer_addr: String) -> String {
-    let mut engine = match InferenceEngine::new() {
-        Ok(eng) => eng,
-        Err(e) => return format!("Failed to load ONNX model: {}", e),
-    };
-    
-    use crate::inference::tensor::MeshTensor;
-    let input_tensor = MeshTensor::new(vec![1, 1], vec![prompt.len() as f32]);
-    let output = match engine.execute_forward_pass(&input_tensor) {
-        Ok(out) => out,
-        Err(e) => return format!("Inference error: {}", e),
-    };
-    
-    let local_result = format!("Local ONNX: {:?}", output.data);
+    // Instead of local execution, we just encode the prompt into a tensor embedding placeholder
+    let input_tensor = vec![prompt.len() as f32];
+    let local_result = format!("Prompt embedded as tensor: {:?}. Passing to Pipeline...", input_tensor);
 
-    let data_bytes = output.data.clone();
-    
     // Generate dummy zk-SNARK proof of compute
     let (zk_proof, zk_inputs) = crate::network::zk_verification::generate_zk_proof();
     
@@ -150,8 +138,8 @@ pub fn send_prompt(originator_id: String, prompt: String, next_peer_addr: String
     rt.spawn(async move {
         let payload = Payload {
             originator_id,
-            step: 1, // First step in sequence
-            tensor_data: data_bytes,
+            step: 0, // 0 means it starts at the first node in the pipeline
+            tensor_data: input_tensor,
             zk_proof,
             zk_inputs,
         };
