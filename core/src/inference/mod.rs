@@ -21,21 +21,35 @@ pub struct InferenceEngine {
 }
 
 impl InferenceEngine {
-    /// Load the bundled ONNX model and open an inference session.
-    pub fn new() -> Result<Self, Box<dyn Error>> {
-        // init() returns bool (true = first init, false = already done). No ? needed.
+    /// Load the bundled dummy ONNX model.
+    pub fn new_default() -> Result<Self, Box<dyn Error>> {
         ort::init()
             .with_name("mesh_core")
             .commit();
 
         let model_bytes = include_bytes!("../../minimal.onnx");
 
-        // Build the session with 1 intra-op thread — lightweight for edge/mobile.
         let session = Session::builder()?
             .with_intra_threads(1)?
             .commit_from_memory(model_bytes)?;
 
-        // .inputs() / .outputs() are methods in rc.13, not public fields.
+        Self::build_engine_from_session(session)
+    }
+
+    /// Load an ONNX model dynamically from the file system.
+    pub fn new_from_file(path: &str) -> Result<Self, Box<dyn Error>> {
+        ort::init()
+            .with_name("mesh_core")
+            .commit();
+
+        let session = Session::builder()?
+            .with_intra_threads(1)?
+            .commit_from_file(path)?;
+
+        Self::build_engine_from_session(session)
+    }
+
+    fn build_engine_from_session(session: Session) -> Result<Self, Box<dyn Error>> {
         let input_name = session
             .inputs()
             .first()
@@ -51,7 +65,7 @@ impl InferenceEngine {
             .to_string();
 
         println!(
-            "[InferenceEngine] ONNX Runtime loaded from bundled memory. \n  Input : [{}]\n  Output: [{}]",
+            "[InferenceEngine] ONNX Runtime loaded. \n  Input : [{}]\n  Output: [{}]",
             input_name, output_name
         );
 
@@ -109,7 +123,7 @@ mod tests {
     /// The model is an Identity node (opset 18) so output must equal input exactly.
     #[test]
     fn test_inference_forward_pass() {
-        let mut engine = InferenceEngine::new()
+        let mut engine = InferenceEngine::new_default()
             .expect("Failed to initialise InferenceEngine with minimal.onnx");
 
         engine.print_model_info();
@@ -133,7 +147,7 @@ mod tests {
     /// Verifies multi-element batches work correctly with the Identity model.
     #[test]
     fn test_batch_forward_pass() {
-        let mut engine = InferenceEngine::new()
+        let mut engine = InferenceEngine::new_default()
             .expect("Failed to initialise InferenceEngine");
 
         // Batch of 4 scalar embeddings packed as [4, 1].

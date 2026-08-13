@@ -76,14 +76,23 @@ impl ProtoRingNode for RingNodeServerImpl {
         let mut forward_payload = payload.clone();
         forward_payload.step += 1;
 
-        // Run this pipeline stage through our local Inference Engine
-        let mut engine = crate::inference::InferenceEngine::new().unwrap();
-        let input_tensor = crate::inference::tensor::MeshTensor::new(
-            vec![forward_payload.tensor_data.len(), 1], 
-            forward_payload.tensor_data.clone()
-        );
+        // Run this pipeline stage through our global Inference Engine
+        let engine_lock = crate::api::get_inference_engine();
+        let mut engine_guard = engine_lock.write().await;
         
-        let output = engine.execute_forward_pass(&input_tensor).unwrap();
+        let output = if let Some(engine) = engine_guard.as_mut() {
+            let input_tensor = crate::inference::tensor::MeshTensor::new(
+                vec![forward_payload.tensor_data.len(), 1], 
+                forward_payload.tensor_data.clone()
+            );
+            engine.execute_forward_pass(&input_tensor).unwrap()
+        } else {
+            // Fallback if no model is loaded
+            crate::inference::tensor::MeshTensor::new(
+                vec![forward_payload.tensor_data.len(), 1], 
+                forward_payload.tensor_data.clone()
+            )
+        };
 
         // Add a signature mutation to prove this node mathematically processed it
         let mut new_data = output.data;

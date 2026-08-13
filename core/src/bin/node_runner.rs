@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let prompt = args[5].clone();
         println!("Node {} executing local ONNX inference on prompt: '{}'", node_id, prompt);
         
-        let mut engine = InferenceEngine::new()?;
+        let mut engine = InferenceEngine::new_default()?;
         let input_tensor = MeshTensor::new(vec![1, 1], vec![prompt.len() as f32]);
         let output = engine.execute_forward_pass(&input_tensor)?;
         

@@ -7,7 +7,10 @@ import 'frb_generated.dart';
 import 'inference/tensor.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `get_peer_state`
+// These functions are ignored because they are not marked as `pub`: `emit_aggregated_result`, `get_inference_engine`, `get_peer_state`
+
+Future<bool> loadModel({required String path}) =>
+    RustLib.instance.api.crateApiLoadModel(path: path);
 
 Stream<Float32List> aggregatedResultStream() =>
     RustLib.instance.api.crateApiAggregatedResultStream();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'src/screens/dashboard_screen.dart';
+import 'src/screens/model_hub_screen.dart';
 import 'src/services/lifecycle_manager.dart';
 
 import 'package:mesh_ui/src/rust/api.dart/frb_generated.dart';
@@ -52,7 +53,48 @@ class MeshNodeApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const DashboardScreen(),
+      home: const MainLayout(),
+    );
+  }
+}
+
+class MainLayout extends StatefulWidget {
+  const MainLayout({super.key});
+
+  @override
+  State<MainLayout> createState() => _MainLayoutState();
+}
+
+class _MainLayoutState extends State<MainLayout> {
+  int _currentIndex = 0;
+
+  final List<Widget> _screens = [
+    const DashboardScreen(),
+    const ModelHubScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _screens[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.cloud_download),
+            label: 'Model Hub',
+          ),
+        ],
+      ),
     );
   }
 }

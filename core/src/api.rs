@@ -21,6 +21,36 @@ static PEER_SINK: OnceCell<StreamSink<String>> = OnceCell::new();
 static PEER_STATE: OnceCell<Arc<Mutex<Vec<PeerHealth>>>> = OnceCell::new();
 
 static AGGREGATED_RESULT_SINK: OnceCell<StreamSink<Vec<f32>>> = OnceCell::new();
+static GLOBAL_INFERENCE_ENGINE: OnceCell<tokio::sync::RwLock<Option<InferenceEngine>>> = OnceCell::new();
+
+pub(crate) fn get_inference_engine() -> &'static tokio::sync::RwLock<Option<InferenceEngine>> {
+    GLOBAL_INFERENCE_ENGINE.get_or_init(|| tokio::sync::RwLock::new(None))
+}
+
+pub fn load_model(path: String) -> bool {
+    let engine_result = if path.is_empty() || path == "default" {
+        InferenceEngine::new_default()
+    } else {
+        InferenceEngine::new_from_file(&path)
+    };
+
+    match engine_result {
+        Ok(engine) => {
+            let rt = RUNTIME.get_or_init(|| Runtime::new().unwrap());
+            rt.block_on(async {
+                let lock = get_inference_engine();
+                let mut guard = lock.write().await;
+                *guard = Some(engine);
+            });
+            println!("Model successfully loaded from: {}", path);
+            true
+        }
+        Err(e) => {
+            eprintln!("Failed to load model from {}: {}", path, e);
+            false
+        }
+    }
+}
 
 pub(crate) fn get_peer_state() -> Arc<Mutex<Vec<PeerHealth>>> {
     PEER_STATE.get_or_init(|| Arc::new(Mutex::new(Vec::new()))).clone()
@@ -86,7 +116,7 @@ pub(crate) fn emit_aggregated_result(data: Vec<f32>) {
 }
 
 pub fn execute_inference(prompt: String) -> String {
-    let _engine = InferenceEngine::new().unwrap();
+    let _engine = InferenceEngine::new_default().unwrap();
     format!("AI output for '{}': OK. Accelerated via ONNX.", prompt)
 }
 
