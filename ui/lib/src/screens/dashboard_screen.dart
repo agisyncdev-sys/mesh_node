@@ -386,42 +386,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor:
-          const Color(0xFF0F0F13), // Ultra premium deep navy dark background
-      appBar: AppBar(
-        title: const Text(
-          'AI Mesh Node Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
-        ),
-        backgroundColor: const Color(0xFF16161F),
-        elevation: 1,
-        actions: [
-          _buildStatusIndicator(),
-        ],
-      ),
-      body: Row(
-        children: [
-          // Sidebar Panel: Configuration
-          _buildSidebar(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 800;
+        
+        final mainContent = Column(
+          children: [
+            // Top Telemetry Header
+            _buildTelemetryHeader(),
 
-          // Main Content Panel: Chat & Gauges
-          Expanded(
-            child: Column(
-              children: [
-                // Top Telemetry Header
-                _buildTelemetryHeader(),
+            // Chat Messages Window
+            Expanded(child: _buildChatArea()),
 
-                // Chat Messages Window
-                Expanded(child: _buildChatArea()),
+            // Prompt Input Box
+            _buildPromptInputArea(),
+          ],
+        );
 
-                // Prompt Input Box
-                _buildPromptInputArea(),
-              ],
+        return Scaffold(
+          backgroundColor:
+              const Color(0xFF0F0F13), // Ultra premium deep navy dark background
+          appBar: AppBar(
+            title: const Text(
+              'AI Mesh Node Dashboard',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
             ),
+            backgroundColor: const Color(0xFF16161F),
+            elevation: 1,
+            actions: [
+              _buildStatusIndicator(),
+            ],
           ),
-        ],
-      ),
+          drawer: isDesktop ? null : Drawer(
+            child: _buildSidebar(),
+          ),
+          body: isDesktop
+              ? Row(
+                  children: [
+                    // Sidebar Panel: Configuration
+                    _buildSidebar(),
+
+                    // Main Content Panel: Chat & Gauges
+                    Expanded(child: mainContent),
+                  ],
+                )
+              : mainContent,
+        );
+      }
     );
   }
 
