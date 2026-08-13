@@ -169,6 +169,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _handleStopNode() {
+    rust_api.notifyGracefulLeave();
+    if (mounted) {
+      setState(() {
+        _isNodeStarted = false;
+        _messages.add({
+          'type': 'info',
+          'text': 'Ring Node gracefully stopped.',
+          'time': DateTime.now(),
+        });
+      });
+    }
+  }
+
   Future<void> _handleConnectToPeer() async {
     final nextPort = _nextPeerPortController.text;
     if (nextPort.isEmpty) return;
@@ -530,11 +544,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _isNodeStarted ? null : _handleStartNode,
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('Start Ring Node'),
+                onPressed: _isNodeStarted ? _handleStopNode : _handleStartNode,
+                icon: Icon(_isNodeStarted ? Icons.stop : Icons.play_arrow),
+                label: Text(_isNodeStarted ? 'Stop Ring Node' : 'Start Ring Node'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3B82F6),
+                  backgroundColor: _isNodeStarted ? Colors.red : const Color(0xFF3B82F6),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
