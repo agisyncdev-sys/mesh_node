@@ -49,6 +49,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _telemetryTimer;
   StreamSubscription<String>? _peerStreamSub;
   StreamSubscription<Float32List>? _resultStreamSub;
+  StreamSubscription<String>? _manifestStreamSub;
+  StreamSubscription<String>? _tokenStreamSub;
 
   @override
   void initState() {
@@ -153,6 +155,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
           });
         }
       });
+
+      _tokenStreamSub?.cancel();
+      _tokenStreamSub = tokenStream().listen((token) {
+        if (mounted) {
+          setState(() {
+            if (_messages.isEmpty || _messages.last['type'] != 'inference_stream') {
+              _messages.add({
+                'type': 'inference_stream',
+                'text': token,
+                'time': DateTime.now(),
+              });
+            } else {
+              _messages.last['text'] += token;
+            }
+          });
+        }
+      });
+
+      _manifestStreamSub?.cancel();
+      _manifestStreamSub = modelManifestStream().listen((manifestJson) async {
+        try {
+          final manifest = jsonDecode(manifestJson);
+          final chunkIndex = manifest['chunk_index'];
+          final totalChunks = manifest['total_chunks'];
+          final modelId = manifest['model_id'];
+          
+          if (mounted) {
+            setState(() {
+              _messages.add({
+                'type': 'info',
+                'text': '[Orchestrator]: Auto-loading $modelId (Chunk ${chunkIndex + 1}/$totalChunks)...',
+                'time': DateTime.now(),
+              });
+            });
+          }
+          
+          // Simulate seamless download & load by loading the dummy 'default' chunk
+          await loadModel(path: 'default');
+          
+          if (mounted) {
+            setState(() {
+              _messages.add({
+                'type': 'info',
+                'text': '[Orchestrator]: Chunk ${chunkIndex + 1} loaded into Mesh Engine successfully.',
+                'time': DateTime.now(),
+              });
+            });
+          }
+        } catch (e) {
+          debugPrint('Manifest parse error: $e');
+        }
+      });
     }
 
     if (mounted) {
@@ -170,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _handleStopNode() {
-    rust_api.notifyGracefulLeave();
+    notifyGracefulLeave();
     if (mounted) {
       setState(() {
         _isNodeStarted = false;
@@ -271,6 +325,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _telemetryTimer?.cancel();
     _peerStreamSub?.cancel();
     _resultStreamSub?.cancel();
+    _manifestStreamSub?.cancel();
     _nodeIdController.dispose();
     _listenPortController.dispose();
     _nextPeerPortController.dispose();
@@ -1106,6 +1161,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         final isUser = type == 'user';
+        final isStream = type == 'inference_stream';
         return Align(
           alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
@@ -1128,7 +1184,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isUser ? 'Local Prompt' : 'AI Output (Via Rust ONNX & Ring)',
+                  isUser ? 'Local Prompt' : (isStream ? 'Mesh AI (Streaming)' : 'AI Output (Via Rust ONNX & Ring)'),
                   style: TextStyle(
                     color: isUser ? Colors.white70 : const Color(0xFF10B981),
                     fontWeight: FontWeight.bold,

@@ -25,6 +25,7 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   integration_test:
     sdk: flutter
+  msix: ^3.18.0
 
 flutter_launcher_icons:
   android: true
@@ -42,3 +43,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/models/
+
+msix:
+  display_name: Mesh UI
+  publisher_display_name: Antigravity
+  identity_name: com.antigravity.mesh.ui
+  msix_version: 1.0.0.0

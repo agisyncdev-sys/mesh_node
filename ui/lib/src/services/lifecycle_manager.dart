@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../rust/api.dart/api.dart' as rust_api;
+import '../rust/api.dart/api.dart';
 
 enum ThermalState {
   normal,
@@ -86,7 +86,7 @@ class LifecycleManager with WidgetsBindingObserver {
 
     if (shouldThrottle != _isThrottled) {
       _isThrottled = shouldThrottle;
-      rust_api.updateNodeThrottling(lowPowerMode: shouldThrottle);
+      updateNodeThrottling(lowPowerMode: shouldThrottle);
       _notifyListeners();
     }
   }
@@ -100,7 +100,7 @@ class LifecycleManager with WidgetsBindingObserver {
       // Graceful leave hook triggers instantly to preserve Ring integrity before suspension
       debugPrint(
           '[Lifecycle] DETACHED/PAUSED state detected. Triggering graceful network leave hook.');
-      rust_api.notifyGracefulLeave();
+      notifyGracefulLeave();
     }
   }
 

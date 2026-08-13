@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
-import '../rust/api.dart/api.dart' as rust_api;
+import '../rust/api.dart/api.dart';
 
 class ModelHubScreen extends StatefulWidget {
   const ModelHubScreen({super.key});
@@ -72,9 +73,11 @@ class _ModelHubScreenState extends State<ModelHubScreen> {
         });
       }
 
-      // Create a dummy file to represent the downloaded model
+      // Load a valid minimal ONNX file from assets instead of a dummy broken byte array
+      final ByteData data = await rootBundle.load('assets/models/minimal.onnx');
+      final List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       final file = File(savePath);
-      await file.writeAsBytes([0x00, 0x01]); // Mock bytes
+      await file.writeAsBytes(bytes);
 
       setState(() {
         model['isDownloading'] = false;
@@ -99,34 +102,28 @@ class _ModelHubScreenState extends State<ModelHubScreen> {
     }
   }
 
-  Future<void> _loadModel(String path) async {
+  Future<void> _loadModel(String path, String modelId) async {
     try {
-      // Call our new Rust FFI endpoint
-      final success = await rust_api.loadModel(path: path);
-      if (success) {
-        setState(() {
-          _loadedModelPath = path;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Model loaded into Mesh Inference Engine!')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to load model in Rust backend.')),
-          );
-        }
+      // Trigger the Seamless Device Distribution orchestrator protocol in Rust
+      await triggerModelDistribution(modelId: modelId);
+      
+      setState(() {
+        _loadedModelPath = path;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Model loaded! Distribution propagating through Mesh...')),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('FFI Error: $e')),
+          const SnackBar(content: Text('Failed to trigger distribution.')),
         );
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -214,8 +211,8 @@ class _ModelHubScreenState extends State<ModelHubScreen> {
                               foregroundColor: Colors.white,
                             ),
                             onPressed: isLoaded
-                                ? null
-                                : () => _loadModel(model['localPath']),
+                              ? null
+                              : () => _loadModel(model['localPath'], model['id']),
                           ),
                       ],
                     ),

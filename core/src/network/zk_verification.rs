@@ -110,14 +110,14 @@ pub fn get_keys() -> &'static (Params<EqAffine>, ProvingKey<EqAffine>, Verifying
     })
 }
 
-pub fn generate_zk_proof() -> (Vec<u8>, Vec<u8>) {
+pub fn generate_zk_proof(w_val: u64, x_val: u64, b_val: u64) -> (Vec<u8>, Vec<u8>) {
     let (params, pk, _) = get_keys();
     let mut rng = OsRng;
     
-    let w = Fp::from(2);
-    let x = Fp::from(3);
-    let b = Fp::from(5);
-    let y = Fp::from(11); // 2 * 3 + 5 = 11
+    let w = Fp::from(w_val);
+    let x = Fp::from(x_val);
+    let b = Fp::from(b_val);
+    let y = Fp::from(w_val * x_val + b_val);
     
     let circuit = MacCircuit {
         w: Value::known(w),

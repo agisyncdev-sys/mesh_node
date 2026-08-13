@@ -1,6 +1,6 @@
 import 'dart:ffi';
 import 'dart:typed_data';
-import '../rust/api.dart/api.dart' as rust_api;
+import '../rust/api.dart/api.dart';
 import '../rust/api.dart/inference/tensor.dart';
 
 /// A wrapper around Rust's SharedTensorBuffer that exposes a zero-copy
@@ -12,7 +12,7 @@ class SafeSharedBuffer {
 
   // Finalizer to ensure memory is released if the object is garbage-collected
   static final Finalizer<SharedTensorBuffer> _finalizer = Finalizer((buf) {
-    rust_api.freeSharedBuffer(buf: buf);
+    freeSharedBuffer(buf: buf);
   });
 
   SafeSharedBuffer._(this._buffer) {
@@ -28,7 +28,7 @@ class SafeSharedBuffer {
   /// Allocates a new shared memory buffer of the given size (number of f32 elements).
   static Future<SafeSharedBuffer> allocate(int size) async {
     final sharedBuf =
-        await rust_api.allocateSharedBuffer(size: BigInt.from(size));
+        await allocateSharedBuffer(size: BigInt.from(size));
     return SafeSharedBuffer._(sharedBuf);
   }
 
@@ -54,6 +54,6 @@ class SafeSharedBuffer {
     if (_isDisposed) return;
     _isDisposed = true;
     _finalizer.detach(this);
-    await rust_api.freeSharedBuffer(buf: _buffer);
+    await freeSharedBuffer(buf: _buffer);
   }
 }

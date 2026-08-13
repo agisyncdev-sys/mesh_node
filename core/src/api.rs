@@ -11,14 +11,20 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use crate::network::node::MeshNode;
 use crate::network::discovery::{PeerHealth, restructure_ring};
+use tokenizers::tokenizer::Tokenizer;
 
 static NODE_RUNNING: AtomicBool = AtomicBool::new(false);
+static GLOBAL_TOKENIZER: OnceCell<tokio::sync::RwLock<Option<Tokenizer>>> = OnceCell::new();
 static RING_RUNNING: AtomicBool = AtomicBool::new(false);
+static NEXT_PEER_ADDR: OnceCell<String> = OnceCell::new();
+static RING_SIZE: OnceCell<u32> = OnceCell::new();
 
 static RUNTIME: OnceCell<Runtime> = OnceCell::new();
 static CANCEL_TOKEN: OnceCell<CancellationToken> = OnceCell::new();
 static PEER_SINK: OnceCell<StreamSink<String>> = OnceCell::new();
 static PEER_STATE: OnceCell<Arc<Mutex<Vec<PeerHealth>>>> = OnceCell::new();
+static MODEL_MANIFEST_SINK: OnceCell<StreamSink<String>> = OnceCell::new();
+static TOKEN_SINK: OnceCell<StreamSink<String>> = OnceCell::new();
 
 static AGGREGATED_RESULT_SINK: OnceCell<StreamSink<Vec<f32>>> = OnceCell::new();
 static GLOBAL_INFERENCE_ENGINE: OnceCell<tokio::sync::RwLock<Option<InferenceEngine>>> = OnceCell::new();
@@ -47,6 +53,26 @@ pub fn load_model(path: String) -> bool {
         }
         Err(e) => {
             eprintln!("Failed to load model from {}: {}", path, e);
+            false
+        }
+    }
+}
+
+pub fn load_tokenizer(path: String) -> bool {
+    let tokenizer_result = Tokenizer::from_file(&path);
+    match tokenizer_result {
+        Ok(tokenizer) => {
+            let rt = RUNTIME.get_or_init(|| Runtime::new().unwrap());
+            rt.block_on(async {
+                let cell = GLOBAL_TOKENIZER.get_or_init(|| tokio::sync::RwLock::new(None));
+                let mut lock = cell.write().await;
+                *lock = Some(tokenizer);
+            });
+            println!("Tokenizer successfully loaded from: {}", path);
+            true
+        },
+        Err(e) => {
+            eprintln!("Failed to load tokenizer from {}: {}", path, e);
             false
         }
     }
@@ -109,6 +135,26 @@ pub fn peer_discovery_stream(sink: StreamSink<String>) {
     PEER_SINK.set(sink).ok();
 }
 
+pub fn model_manifest_stream(sink: StreamSink<String>) {
+    MODEL_MANIFEST_SINK.set(sink).ok();
+}
+
+pub(crate) fn emit_model_manifest(json_payload: String) {
+    if let Some(sink) = MODEL_MANIFEST_SINK.get() {
+        let _ = sink.add(json_payload);
+    }
+}
+
+pub fn token_stream(sink: StreamSink<String>) {
+    TOKEN_SINK.set(sink).ok();
+}
+
+pub(crate) fn emit_token(token: String) {
+    if let Some(sink) = TOKEN_SINK.get() {
+        let _ = sink.add(token);
+    }
+}
+
 pub(crate) fn emit_aggregated_result(data: Vec<f32>) {
     if let Some(sink) = AGGREGATED_RESULT_SINK.get() {
         let _ = sink.add(data);
@@ -125,6 +171,8 @@ pub fn start_node(listen_addr: String, next_peer_addr: String, ring_size: u32, n
         return false;
     }
     RING_RUNNING.store(true, Ordering::SeqCst);
+    let _ = NEXT_PEER_ADDR.set(next_peer_addr.clone());
+    let _ = RING_SIZE.set(ring_size);
 
     thread::spawn(move || {
         let rt = Runtime::new().unwrap();
@@ -157,12 +205,24 @@ pub fn connect_to_peer(peer_addr: String) -> bool {
 }
 
 pub fn send_prompt(originator_id: String, prompt: String, next_peer_addr: String) -> String {
-    // Instead of local execution, we just encode the prompt into a tensor embedding placeholder
-    let input_tensor = vec![prompt.len() as f32];
+    let rt = RUNTIME.get_or_init(|| Runtime::new().unwrap());
+    
+    let mut input_tensor = vec![prompt.len() as f32];
+    
+    rt.block_on(async {
+        let cell = GLOBAL_TOKENIZER.get_or_init(|| tokio::sync::RwLock::new(None));
+        let lock = cell.read().await;
+        if let Some(tokenizer) = lock.as_ref() {
+            if let Ok(encoding) = tokenizer.encode(prompt.clone(), true) {
+                input_tensor = encoding.get_ids().iter().map(|id| *id as f32).collect();
+            }
+        }
+    });
+
     let local_result = format!("Prompt embedded as tensor: {:?}. Passing to Pipeline...", input_tensor);
 
-    // Generate dummy zk-SNARK proof of compute
-    let (zk_proof, zk_inputs) = crate::network::zk_verification::generate_zk_proof();
+    // Generate dummy zk-SNARK proof of compute (for initial step)
+    let (zk_proof, zk_inputs) = crate::network::zk_verification::generate_zk_proof(1, 1, 1);
     
     let rt = RUNTIME.get_or_init(|| Runtime::new().unwrap());
     rt.spawn(async move {
@@ -177,6 +237,25 @@ pub fn send_prompt(originator_id: String, prompt: String, next_peer_addr: String
     });
 
     local_result
+}
+
+pub fn trigger_model_distribution(model_id: String) {
+    let rt = RUNTIME.get_or_init(|| Runtime::new().unwrap());
+    
+    let total_chunks = *RING_SIZE.get().unwrap_or(&3);
+    let next_peer_addr = NEXT_PEER_ADDR.get().cloned().unwrap_or_else(|| "127.0.0.1:50062".to_string());
+    
+    rt.spawn(async move {
+        // We load Chunk 0 locally
+        emit_model_manifest(format!("{{\"model_id\": \"{}\", \"chunk_index\": 0, \"total_chunks\": {}}}", model_id, total_chunks));
+        
+        let payload = crate::network::ring::ring_proto::ManifestPayload {
+            model_id,
+            total_chunks,
+            current_index: 1, // Next peer gets chunk 1
+        };
+        let _ = crate::network::ring::forward_manifest_to_peer(&next_peer_addr, payload).await;
+    });
 }
 
 pub fn get_telemetry_json() -> String {

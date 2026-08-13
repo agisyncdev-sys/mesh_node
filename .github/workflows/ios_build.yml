@@ -1,52 +1,49 @@
-name: iOS Build
+name: Build iOS IPA
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   build_ios:
     name: Build iOS IPA
     runs-on: macos-latest
-    
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Rust
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
-
-      - name: Install Protoc
-        run: brew install protobuf
+          targets: aarch64-apple-ios, x86_64-apple-ios
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          
-      - name: Install dependencies
+
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version ^2.0.0
+
+      - name: Generate Rust Bindings
+        working-directory: ./ui
+        run: flutter_rust_bridge_codegen generate
+
+      - name: Install Dependencies
         working-directory: ./ui
         run: flutter pub get
 
-      - name: Build iOS (No Codesign)
+      - name: Build IPA
         working-directory: ./ui
-        run: flutter build ios --release --no-codesign -v
-        
-      - name: Package unsigned IPA
-        working-directory: ./ui
-        run: |
-          mkdir -p build/ios/iphoneos/Payload
-          cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
-          cd build/ios/iphoneos
-          zip -r meshnode.ipa Payload
-        
+        # Note: --no-codesign is used because a developer certificate and provisioning profile are required to sign iOS apps.
+        # If you add your certificates to GitHub Secrets, remove the --no-codesign flag.
+        run: flutter build ipa --release --no-codesign
+
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: meshnode-ipa
-          path: ui/build/ios/iphoneos/meshnode.ipa
+          name: Mesh-UI-iOS-IPA
+          path: ui/build/ios/ipa/*.ipa

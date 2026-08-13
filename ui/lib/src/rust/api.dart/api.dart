@@ -7,10 +7,13 @@ import 'frb_generated.dart';
 import 'inference/tensor.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `emit_aggregated_result`, `get_inference_engine`, `get_peer_state`
+// These functions are ignored because they are not marked as `pub`: `emit_aggregated_result`, `emit_model_manifest`, `emit_token`, `get_inference_engine`, `get_peer_state`
 
 Future<bool> loadModel({required String path}) =>
     RustLib.instance.api.crateApiLoadModel(path: path);
+
+Future<bool> loadTokenizer({required String path}) =>
+    RustLib.instance.api.crateApiLoadTokenizer(path: path);
 
 Stream<Float32List> aggregatedResultStream() =>
     RustLib.instance.api.crateApiAggregatedResultStream();
@@ -20,6 +23,11 @@ Future<void> startMeshNode({required int port}) =>
 
 Stream<String> peerDiscoveryStream() =>
     RustLib.instance.api.crateApiPeerDiscoveryStream();
+
+Stream<String> modelManifestStream() =>
+    RustLib.instance.api.crateApiModelManifestStream();
+
+Stream<String> tokenStream() => RustLib.instance.api.crateApiTokenStream();
 
 Future<String> executeInference({required String prompt}) =>
     RustLib.instance.api.crateApiExecuteInference(prompt: prompt);
@@ -44,6 +52,9 @@ Future<String> sendPrompt(
         required String nextPeerAddr}) =>
     RustLib.instance.api.crateApiSendPrompt(
         originatorId: originatorId, prompt: prompt, nextPeerAddr: nextPeerAddr);
+
+Future<void> triggerModelDistribution({required String modelId}) =>
+    RustLib.instance.api.crateApiTriggerModelDistribution(modelId: modelId);
 
 Future<String> getTelemetryJson() =>
     RustLib.instance.api.crateApiGetTelemetryJson();

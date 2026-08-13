@@ -3,6 +3,8 @@ package ring_allreduce;
 
 service RingNode {
   rpc PassPayload (Payload) returns (Empty);
+  rpc StreamToken (TokenPayload) returns (Empty);
+  rpc DistributeManifest (ManifestPayload) returns (Empty);
 }
 
 message Payload {
@@ -11,6 +13,18 @@ message Payload {
   repeated float tensor_data = 3;
   bytes zk_proof = 4;
   bytes zk_inputs = 5;
+}
+
+message TokenPayload {
+  string originator_id = 1;
+  uint32 token_id = 2;
+  string decoded_text = 3;
+}
+
+message ManifestPayload {
+  string model_id = 1;
+  uint32 total_chunks = 2;
+  uint32 current_index = 3;
 }
 
 message Empty {}

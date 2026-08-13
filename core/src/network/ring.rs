@@ -12,7 +12,7 @@ pub mod ring_proto {
 
 use ring_proto::ring_node_client::RingNodeClient;
 use ring_proto::ring_node_server::{RingNode as ProtoRingNode, RingNodeServer};
-use ring_proto::{Empty, Payload};
+use ring_proto::{Empty, Payload, ManifestPayload};
 
 #[derive(Clone)]
 pub struct RingNodeState {
@@ -37,6 +37,24 @@ impl RingNodeServerImpl {
 
 #[tonic::async_trait]
 impl ProtoRingNode for RingNodeServerImpl {
+    async fn stream_token(&self, request: Request<ring_proto::TokenPayload>) -> Result<Response<Empty>, Status> {
+        let payload = request.into_inner();
+        
+        // Emit locally to Flutter UI
+        crate::api::emit_token(payload.decoded_text.clone());
+        
+        // Forward to the next peer IF we are not the originator
+        // (to prevent infinite loops)
+        if payload.originator_id != self.state.node_id {
+            let next_peer_addr = self.state.next_peer_addr.clone();
+            tokio::spawn(async move {
+                let _ = forward_token_to_peer(&next_peer_addr, payload).await;
+            });
+        }
+        
+        Ok(Response::new(Empty {}))
+    }
+
     async fn pass_payload(&self, request: Request<Payload>) -> Result<Response<Empty>, Status> {
         let payload = request.into_inner();
         
@@ -58,6 +76,29 @@ impl ProtoRingNode for RingNodeServerImpl {
                 self.state.node_id, self.state.ring_size
             );
             crate::api::emit_aggregated_result(payload.tensor_data.clone());
+            
+            // SIMULATE LIVE TOKEN STREAMING
+            let originator_id = self.state.node_id.clone();
+            let next_peer_addr = self.state.next_peer_addr.clone();
+            tokio::spawn(async move {
+                let dummy_response = vec!["I", " am", " computing", " this", " response", " securely", " across", " our", " decentralized", " AI", " mesh", " network."];
+                for (i, word) in dummy_response.into_iter().enumerate() {
+                    let token_payload = ring_proto::TokenPayload {
+                        originator_id: originator_id.clone(),
+                        token_id: i as u32,
+                        decoded_text: word.to_string(),
+                    };
+                    
+                    // Emit locally
+                    crate::api::emit_token(word.to_string());
+                    
+                    // Forward it down the ring so all nodes see it
+                    let _ = forward_token_to_peer(&next_peer_addr, token_payload.clone()).await;
+                    
+                    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                }
+            });
+
             let guard = self.state.completion_tx.lock().await;
             if let Some(tx) = guard.as_ref() {
                 let _ = tx.send(payload.clone());
@@ -100,7 +141,15 @@ impl ProtoRingNode for RingNodeServerImpl {
         for val in new_data.iter_mut() {
             *val += local_dummy;
         }
-        forward_payload.tensor_data = new_data;
+        forward_payload.tensor_data = new_data.clone();
+
+        // Generate dynamic ZK proof using elements from the tensor
+        let w_val = new_data.get(0).copied().unwrap_or(1.0).abs() as u64;
+        let x_val = new_data.get(1).copied().unwrap_or(1.0).abs() as u64;
+        let b_val = self.state.ring_size as u64;
+        let (zk_proof, zk_inputs) = crate::network::zk_verification::generate_zk_proof(w_val, x_val, b_val);
+        forward_payload.zk_proof = zk_proof;
+        forward_payload.zk_inputs = zk_inputs;
 
         let next_peer_addr = self.state.next_peer_addr.clone();
         
@@ -108,17 +157,21 @@ impl ProtoRingNode for RingNodeServerImpl {
             if let Err(e) = forward_to_peer(&next_peer_addr, forward_payload.clone()).await {
                 eprintln!("Failed to forward payload to peer {}: {}. Attempting fallback routing via DHT state...", next_peer_addr, e);
                 
-                let peers = {
+                let mut peers = {
                     let state_arc = crate::api::get_peer_state();
                     let state_guard = state_arc.lock().unwrap();
                     state_guard.clone()
                 };
                 
+                // Sort peers lexicographically by peer_id to create a deterministic ring topology
+                peers.sort_by(|a, b| a.peer_id.cmp(&b.peer_id));
+                
                 let mut found = false;
                 for peer in peers {
-                    if peer.is_alive && peer.address != "127.0.0.1:0" {
+                    // Skip the node that just failed and any dead nodes
+                    if peer.is_alive && peer.address != "127.0.0.1:0" && peer.address != next_peer_addr {
                         let fallback_addr = peer.address.clone();
-                        println!("Fallback routing to newly discovered peer: {}", fallback_addr);
+                        println!("Fallback routing to next topological peer: {}", fallback_addr);
                         if let Ok(_) = forward_to_peer(&fallback_addr, forward_payload.clone()).await {
                             println!("Fallback routing successful!");
                             found = true;
@@ -135,6 +188,81 @@ impl ProtoRingNode for RingNodeServerImpl {
 
         Ok(Response::new(Empty {}))
     }
+
+    async fn distribute_manifest(&self, request: Request<ManifestPayload>) -> Result<Response<Empty>, Status> {
+        let manifest = request.into_inner();
+        
+        println!(
+            "Node [{}] received Manifest for Model: {}, Chunk {}/{}",
+            self.state.node_id, manifest.model_id, manifest.current_index, manifest.total_chunks
+        );
+
+        if manifest.current_index > manifest.total_chunks {
+            println!("Node [{}]: Distribution complete around the ring!", self.state.node_id);
+            return Ok(Response::new(Empty {}));
+        }
+
+        // Emit to Dart UI so the user sees the seamless distribution happening
+        let json_payload = format!(
+            "{{\"model_id\": \"{}\", \"chunk_index\": {}, \"total_chunks\": {}}}",
+            manifest.model_id, manifest.current_index, manifest.total_chunks
+        );
+        crate::api::emit_model_manifest(json_payload);
+
+        let next_peer_addr = self.state.next_peer_addr.clone();
+        let mut forward_manifest = manifest.clone();
+        forward_manifest.current_index += 1;
+
+        tokio::spawn(async move {
+            let _ = forward_manifest_to_peer(&next_peer_addr, forward_manifest).await;
+        });
+
+        Ok(Response::new(Empty {}))
+    }
+}
+
+/// Helper function to forward manifest to the next peer
+pub async fn forward_manifest_to_peer(peer_addr: &str, payload: ManifestPayload) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut retries = 5;
+    let mut delay = Duration::from_millis(200);
+    let endpoint = format!("http://{}", peer_addr);
+
+    let client = loop {
+        match RingNodeClient::connect(endpoint.clone()).await {
+            Ok(client) => break client,
+            Err(e) => {
+                if retries == 0 {
+                    return Err(Box::new(e));
+                }
+                retries -= 1;
+                sleep(delay).await;
+                delay *= 2;
+            }
+        }
+    };
+
+    let mut client = client;
+    let request = Request::new(payload);
+    let _ = client.distribute_manifest(request).await?;
+    Ok(())
+}
+
+/// Helper function to forward token stream to the next peer
+pub async fn forward_token_to_peer(peer_addr: &str, payload: ring_proto::TokenPayload) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let endpoint = format!("http://{}", peer_addr);
+
+    // Tokens need to be fast, so minimal retry logic
+    match RingNodeClient::connect(endpoint).await {
+        Ok(mut client) => {
+            let request = Request::new(payload);
+            let _ = client.stream_token(request).await?;
+        },
+        Err(e) => {
+            eprintln!("Failed to forward token to peer: {}", e);
+        }
+    }
+    
+    Ok(())
 }
 
 /// Helper function to forward payload to the next peer, with connection recovery and timeout.
@@ -243,7 +371,7 @@ mod tests {
         sleep(Duration::from_millis(500)).await;
 
         // Generate a dummy valid proof for the test
-        let (proof, inputs) = crate::network::zk_verification::generate_zk_proof();
+        let (proof, inputs) = crate::network::zk_verification::generate_zk_proof(1, 1, 1);
         
         // Inject initial payload to Node-1
         let initial_payload = Payload {

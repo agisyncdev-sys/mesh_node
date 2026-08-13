@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let result_str = format!("Result: {:?}", output.data);
         println!("Local ONNX Inference Result: {}", result_str);
         
-        let (zk_proof, zk_inputs) = rust_lib_mesh_ui::network::zk_verification::generate_zk_proof();
+        let (zk_proof, zk_inputs) = rust_lib_mesh_ui::network::zk_verification::generate_zk_proof(1, 1, 1);
         
         let payload = Payload {
             originator_id: node_id.clone(),

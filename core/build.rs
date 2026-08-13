@@ -29,10 +29,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "cargo:rustc-link-search=native={}",
             ort_lib_dir.display()
         );
-        println!(
-            "cargo:rustc-env=ORT_DYLIB_PATH={}",
-            ort_lib_dir.join("onnxruntime.dll").display()
-        );
+        // Do not hardcode the absolute path at compile time!
+        // println!(
+        //     "cargo:rustc-env=ORT_DYLIB_PATH={}",
+        //     ort_lib_dir.join("onnxruntime.dll").display()
+        // );
     } else {
         println!(
             "cargo:rustc-env=ORT_DYLIB_PATH=onnxruntime"
