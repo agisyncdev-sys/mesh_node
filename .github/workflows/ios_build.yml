@@ -21,6 +21,9 @@ jobs:
         with:
           targets: aarch64-apple-ios, x86_64-apple-ios, aarch64-apple-ios-sim
 
+      - name: Install Protoc
+        run: brew install protobuf
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
