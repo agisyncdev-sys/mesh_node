@@ -1,9 +1,9 @@
 use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use mesh_core::network::ring::{start_ring_node, RingNodeState, forward_to_peer, ring_proto::Payload};
-use mesh_core::inference::InferenceEngine;
-use mesh_core::inference::tensor::MeshTensor;
+use rust_lib_mesh_ui::network::ring::{start_ring_node, RingNodeState, forward_to_peer, ring_proto::Payload};
+use rust_lib_mesh_ui::inference::InferenceEngine;
+use rust_lib_mesh_ui::inference::tensor::MeshTensor;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let result_str = format!("Result: {:?}", output.data);
         println!("Local ONNX Inference Result: {}", result_str);
         
-        let (zk_proof, zk_inputs) = mesh_core::network::zk_verification::generate_zk_proof();
+        let (zk_proof, zk_inputs) = rust_lib_mesh_ui::network::zk_verification::generate_zk_proof();
         
         let payload = Payload {
             originator_id: node_id.clone(),
