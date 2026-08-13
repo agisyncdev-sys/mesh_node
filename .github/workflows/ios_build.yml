@@ -32,7 +32,7 @@ jobs:
 
       - name: Build iOS (No Codesign)
         working-directory: ./ui
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign -v
         
       - name: Package unsigned IPA
         working-directory: ./ui
