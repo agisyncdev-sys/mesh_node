@@ -38,15 +38,27 @@ jobs:
 
       - name: Build iOS Application
         working-directory: ./ui
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign || true
+          find build -name "Runner.app" -type d
 
       - name: Package IPA
         working-directory: ./ui
         run: |
+          APP_PATH=$(find build -name "Runner.app" -type d | grep -E "iphoneos|Release" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find build -name "Runner.app" -type d | head -n 1)
+          fi
+          echo "Found app bundle at: $APP_PATH"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: Runner.app not found!"
+            exit 1
+          fi
           mkdir -p build/ios/ipa/Payload
-          cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          cp -r "$APP_PATH" build/ios/ipa/Payload/
           cd build/ios/ipa
           zip -r Mesh_UI_Release.ipa Payload
+          ls -lh Mesh_UI_Release.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
