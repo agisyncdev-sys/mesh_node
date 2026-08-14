@@ -22,6 +22,7 @@ A new Flutter FFI plugin project.
   s.dependency 'Flutter'
   s.platform = :ios, '11.0'
   s.frameworks = 'SystemConfiguration', 'Security', 'CoreFoundation'
+  s.libraries = 'c++'
 
   # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
@@ -41,6 +42,6 @@ A new Flutter FFI plugin project.
     'DEFINES_MODULE' => 'YES',
     # Flutter.framework does not contain a i386 slice.
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/librust_lib_mesh_ui.a',
+    'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/librust_lib_mesh_ui.a -lc++',
   }
 end
