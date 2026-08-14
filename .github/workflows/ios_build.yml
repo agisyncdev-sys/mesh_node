@@ -39,7 +39,7 @@ jobs:
       - name: Build iOS Application
         working-directory: ./ui
         run: |
-          flutter build ios --config-only --release
+          flutter build ios --release --no-codesign --config-only || flutter build ios --release --no-codesign || true
           cd ios
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
@@ -50,16 +50,27 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             ARCHS="arm64" \
-            build \
-            CONFIGURATION_BUILD_DIR=../build/ios/iphoneos
+            -derivedDataPath ../build/DerivedData \
+            build
 
       - name: Package IPA
         working-directory: ./ui
         run: |
-          echo "Listing build/ios/iphoneos:"
-          ls -la build/ios/iphoneos/Runner.app
+          APP_PATH=""
+          for dir in $(find build -name "Runner.app" -type d); do
+            if [ -f "$dir/Info.plist" ] && [ -f "$dir/Runner" ]; then
+              APP_PATH="$dir"
+              break
+            fi
+          done
+          echo "Found valid app bundle at: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Valid Runner.app with executable was not found!"
+            exit 1
+          fi
+          ls -la "$APP_PATH"
           mkdir -p build/ios/ipa/Payload
-          cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          cp -r "$APP_PATH" build/ios/ipa/Payload/
           cd build/ios/ipa
           zip -r Mesh_UI_Release.ipa Payload
           ls -lh Mesh_UI_Release.ipa
