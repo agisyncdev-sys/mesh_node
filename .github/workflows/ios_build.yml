@@ -32,6 +32,11 @@ jobs:
         working-directory: ./ui
         run: flutter_rust_bridge_codegen generate
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install Dependencies
         working-directory: ./ui
         run: flutter pub get
@@ -46,9 +51,9 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_IDENTITY="" \
             ARCHS="arm64" \
             -derivedDataPath ../build/DerivedData \
             build
