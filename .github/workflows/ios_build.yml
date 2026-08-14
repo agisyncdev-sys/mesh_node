@@ -39,16 +39,16 @@ jobs:
       - name: Build iOS Application
         working-directory: ./ui
         run: |
-          flutter build ios --release --no-codesign --config-only || flutter build ios --release --no-codesign || true
+          flutter build ios --release --no-codesign --config-only || true
           cd ios
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE="Manual" \
             ARCHS="arm64" \
             -derivedDataPath ../build/DerivedData \
             build
