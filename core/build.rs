@@ -42,6 +42,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "ios" {
         println!("cargo:rustc-link-lib=framework=SystemConfiguration");
+        println!("cargo:rustc-link-lib=framework=Security");
+        println!("cargo:rustc-link-lib=framework=CoreFoundation");
     }
 
     Ok(())

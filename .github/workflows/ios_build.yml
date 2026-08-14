@@ -36,14 +36,20 @@ jobs:
         working-directory: ./ui
         run: flutter pub get
 
-      - name: Build IPA
+      - name: Build iOS Application
         working-directory: ./ui
-        # Note: --no-codesign is used because a developer certificate and provisioning profile are required to sign iOS apps.
-        # If you add your certificates to GitHub Secrets, remove the --no-codesign flag.
-        run: flutter build ipa --release --no-codesign
+        run: flutter build ios --release --no-codesign
+
+      - name: Package IPA
+        working-directory: ./ui
+        run: |
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -r Mesh_UI_Release.ipa Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Mesh-UI-iOS-IPA
-          path: ui/build/ios/ipa/*.ipa
+          path: ui/build/ios/ipa/Mesh_UI_Release.ipa
