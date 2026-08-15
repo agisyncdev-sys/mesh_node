@@ -266,11 +266,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         if (mounted) {
+          // Deduplicate peers by IP address (same device may appear on multiple ports/protocols)
+          final Set<String> seenIPs = {};
+          final List<dynamic> uniquePeers = [];
+
+          // Get our own local IPs to filter out self-discovery
+          final Set<String> myIPs = {'127.0.0.1'};
+          try {
+            final ifaces = await NetworkInterface.list(type: InternetAddressType.IPv4, includeLoopback: false);
+            for (final iface in ifaces) {
+              for (final addr in iface.addresses) {
+                myIPs.add(addr.address);
+              }
+            }
+          } catch (_) {}
+
+          for (final peer in peersData) {
+            final address = (peer['address'] ?? '').toString();
+            // Extract just the IP from "ip:port" or "/ip4/x.x.x.x/tcp/port"
+            String ip = address;
+            if (address.contains(':')) {
+              ip = address.split(':').first;
+            } else if (address.contains('/ip4/')) {
+              final match = RegExp(r'/ip4/([^/]+)').firstMatch(address);
+              if (match != null) ip = match.group(1)!;
+            }
+
+            // Skip self (our own IP on our own port) and localhost
+            if (myIPs.contains(ip)) continue;
+
+            // Deduplicate: one entry per unique IP
+            if (!seenIPs.contains(ip)) {
+              seenIPs.add(ip);
+              uniquePeers.add(peer);
+            }
+          }
+
           setState(() {
             _ramRssMb = data['ram_rss_mb'] ?? 0;
             _ramVszMb = data['ram_vsz_mb'] ?? 0;
             _latencyMs = data['latency_ms'] ?? 0;
-            _discoveredPeers = peersData;
+            _discoveredPeers = uniquePeers;
           });
         }
       } catch (e) {
