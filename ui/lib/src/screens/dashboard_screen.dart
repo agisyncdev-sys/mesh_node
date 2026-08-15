@@ -169,13 +169,102 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) setState(() {});
   }
 
+  /// Cached subnet IPs discovered from local network interfaces
+  List<String>? _cachedSubnetIPs;
+
+  /// Build candidate IPs from all local network interfaces dynamically
+  Future<List<String>> _getSubnetCandidateIPs() async {
+    if (_cachedSubnetIPs != null) return _cachedSubnetIPs!;
+
+    final Set<String> candidates = {};
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLoopback: false,
+      );
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
+          final ip = addr.address;
+          // Skip link-local (169.254.x.x) and loopback
+          if (ip.startsWith('169.254') || ip == '127.0.0.1') continue;
+
+          // Extract /24 subnet prefix and generate all host IPs
+          final parts = ip.split('.');
+          if (parts.length == 4) {
+            final prefix = '${parts[0]}.${parts[1]}.${parts[2]}';
+            for (int host = 1; host <= 254; host++) {
+              final candidate = '$prefix.$host';
+              if (candidate != ip) {
+                candidates.add(candidate);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('NetworkInterface.list() failed: $e');
+    }
+
+    // Always include common hotspot/tethering subnets as fallback
+    for (final prefix in ['192.168.1', '192.168.0', '172.20.10', '10.0.0']) {
+      for (int host = 1; host <= 10; host++) {
+        candidates.add('$prefix.$host');
+      }
+    }
+
+    _cachedSubnetIPs = candidates.toList();
+    debugPrint('Subnet scanner: ${_cachedSubnetIPs!.length} candidate IPs from ${candidates.length} unique addresses');
+    return _cachedSubnetIPs!;
+  }
+
   void _startTelemetryPoll() {
-    _telemetryTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+    _telemetryTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       try {
         final jsonStr = await getTelemetryJson();
         final Map<String, dynamic> data = jsonDecode(jsonStr);
         final peersJsonStr = await getDiscoveredPeersHealth();
-        final List<dynamic> peersData = jsonDecode(peersJsonStr);
+        List<dynamic> peersData = jsonDecode(peersJsonStr);
+
+        // Active subnet discovery: scan real local subnet in parallel
+        if (peersData.isEmpty) {
+          final candidateIPs = await _getSubnetCandidateIPs();
+          final probePorts = [50061, 50062, 50063];
+          final myPort = int.tryParse(_listenPortController.text) ?? 50061;
+
+          // Probe all candidates in parallel (fast 300ms timeout in Rust layer)
+          final futures = <Future<MapEntry<String, bool>>>[];
+          for (final ip in candidateIPs) {
+            for (final port in probePorts) {
+              if (ip == '127.0.0.1' && port == myPort) continue;
+              final target = '$ip:$port';
+              futures.add(
+                connectToPeer(peerAddr: target).then(
+                  (ok) => MapEntry(target, ok),
+                  onError: (_) => MapEntry(target, false),
+                ),
+              );
+            }
+          }
+
+          final results = await Future.wait(futures);
+          for (final entry in results) {
+            if (entry.value && !peersData.any((p) => p['address'] == entry.key)) {
+              peersData.add({
+                'peer_id': 'Peer @ ${entry.key}',
+                'address': entry.key,
+                'latency_ms': 5,
+                'is_alive': true,
+              });
+            }
+          }
+
+          // Re-read core state since Rust probes register peers too
+          if (peersData.isEmpty) {
+            final refreshed = await getDiscoveredPeersHealth();
+            peersData = jsonDecode(refreshed);
+          }
+        }
+
         if (mounted) {
           setState(() {
             _ramRssMb = data['ram_rss_mb'] ?? 0;

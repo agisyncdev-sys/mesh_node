@@ -194,12 +194,30 @@ pub fn start_node(listen_addr: String, next_peer_addr: String, ring_size: u32, n
 }
 
 pub fn connect_to_peer(peer_addr: String) -> bool {
-    let rt = Runtime::new().unwrap();
+    let rt = RUNTIME.get_or_init(|| Runtime::new().unwrap());
     rt.block_on(async {
         use crate::network::ring::ring_proto::ring_node_client::RingNodeClient;
-        match RingNodeClient::connect(format!("http://{}", peer_addr)).await {
-            Ok(_) => true,
-            Err(_) => false,
+        // Fast 300ms timeout so subnet scanning doesn't block for ages
+        let result = tokio::time::timeout(
+            Duration::from_millis(300),
+            RingNodeClient::connect(format!("http://{}", peer_addr))
+        ).await;
+        match result {
+            Ok(Ok(mut client)) => {
+                // Also register this peer in shared state so mDNS-free discovery works
+                if let Ok(mut peers) = get_peer_state().lock() {
+                    if !peers.iter().any(|p| p.address == peer_addr) {
+                        peers.push(PeerHealth::new(
+                            format!("gRPC-{}", peer_addr),
+                            peer_addr.clone(),
+                            Duration::from_millis(5),
+                            true,
+                        ));
+                    }
+                }
+                true
+            }
+            _ => false,
         }
     })
 }
