@@ -1,17 +1,9 @@
 package com.example.mesh_ui
 
 import io.flutter.embedding.android.FlutterActivity
-import android.os.Bundle
 
-class MainActivity : FlutterActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        try {
-            System.loadLibrary("rust_lib_mesh_ui")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } catch (e: UnsatisfiedLinkError) {
-            e.printStackTrace()
-        }
-    }
-}
+// flutter_rust_bridge loads the native library automatically via the
+// JNI plugin mechanism. Do NOT call System.loadLibrary() manually here
+// as it conflicts with the Dart-side FFI initialisation and causes
+// a white-screen crash on launch.
+class MainActivity : FlutterActivity()
