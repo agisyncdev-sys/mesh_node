@@ -135,9 +135,20 @@ impl ProtoRingNode for RingNodeServerImpl {
             )
         };
 
-        // Add a signature mutation to prove this node mathematically processed it
+        // Get the specific chunk index this node is assigned to (defaults to 0 if unknown)
+        let my_chunk_idx = {
+            let chunk_cell = crate::api::MY_CHUNK_INDEX.get_or_init(|| std::sync::RwLock::new(None));
+            if let Ok(lock) = chunk_cell.read() {
+                lock.unwrap_or(0)
+            } else {
+                0
+            }
+        };
+
+        // Add a signature mutation to prove this node mathematically processed its DISTINCT chunk
         let mut new_data = output.data;
-        let local_dummy = 1.0; 
+        // Distinct mutation based on chunk index: slice 0 adds 1.0, slice 1 adds 2.0, etc.
+        let local_dummy = 1.0 * ((my_chunk_idx + 1) as f32); 
         for val in new_data.iter_mut() {
             *val += local_dummy;
         }
@@ -200,6 +211,12 @@ impl ProtoRingNode for RingNodeServerImpl {
         if manifest.current_index > manifest.total_chunks {
             println!("Node [{}]: Distribution complete around the ring!", self.state.node_id);
             return Ok(Response::new(Empty {}));
+        }
+
+        // Save our assigned chunk index locally for distinction during inference
+        let chunk_cell = crate::api::MY_CHUNK_INDEX.get_or_init(|| std::sync::RwLock::new(None));
+        if let Ok(mut lock) = chunk_cell.write() {
+            *lock = Some(manifest.current_index);
         }
 
         // Emit to Dart UI so the user sees the seamless distribution happening

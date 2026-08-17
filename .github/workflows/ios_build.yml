@@ -9,7 +9,7 @@ on:
 jobs:
   build_ios:
     name: Build iOS IPA
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
       - name: Checkout Repository

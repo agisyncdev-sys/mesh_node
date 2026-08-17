@@ -36,6 +36,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Chat Messages: list of { 'type': 'user' | 'assistant' | 'system', 'text': String, 'time': DateTime, 'verified': bool, 'devices': int }
   final List<Map<String, dynamic>> _messages = [];
 
+  // Distributed Chunking State
+  int? _myChunkIndex;
+  int? _totalChunks;
+
   // Telemetry & Discovery
   int _ramRssMb = 0;
   int _ramVszMb = 0;
@@ -148,6 +152,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _manifestStreamSub?.cancel();
         _manifestStreamSub = modelManifestStream().listen((manifestJson) async {
           try {
+            final data = jsonDecode(manifestJson);
+            setState(() {
+              _myChunkIndex = data['chunk_index'];
+              _totalChunks = data['total_chunks'];
+            });
             await loadModel(path: 'default');
           } catch (e) {
             debugPrint('Auto manifest load error: $e');
@@ -478,7 +487,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 6),
                   Text(
                     activeDeviceCount > 1 
-                        ? '$activeDeviceCount Devices Mesh' 
+                        ? (_myChunkIndex != null ? '$activeDeviceCount Devices Mesh | Chunk $_myChunkIndex' : '$activeDeviceCount Devices Mesh')
                         : (_isNodeStarted ? 'Mesh Ready' : 'Connecting...'),
                     style: TextStyle(
                       fontSize: 12,
@@ -808,7 +817,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: const Icon(Icons.computer, color: Color(0xFF60A5FA)),
                 ),
                 title: Text(_deviceFriendlyName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                subtitle: const Text('This Device • Core Coordinator', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                subtitle: Text(
+                  _myChunkIndex != null ? 'This Device • Assigned Slice: Chunk $_myChunkIndex/$_totalChunks' : 'This Device • Core Coordinator', 
+                  style: const TextStyle(color: Colors.white54, fontSize: 12)
+                ),
                 trailing: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18),
               ),
 

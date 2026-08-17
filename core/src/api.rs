@@ -29,6 +29,8 @@ static TOKEN_SINK: OnceCell<StreamSink<String>> = OnceCell::new();
 static AGGREGATED_RESULT_SINK: OnceCell<StreamSink<Vec<f32>>> = OnceCell::new();
 static GLOBAL_INFERENCE_ENGINE: OnceCell<tokio::sync::RwLock<Option<InferenceEngine>>> = OnceCell::new();
 
+pub static MY_CHUNK_INDEX: OnceCell<std::sync::RwLock<Option<u32>>> = OnceCell::new();
+
 pub(crate) fn get_inference_engine() -> &'static tokio::sync::RwLock<Option<InferenceEngine>> {
     GLOBAL_INFERENCE_ENGINE.get_or_init(|| tokio::sync::RwLock::new(None))
 }
@@ -264,7 +266,12 @@ pub fn trigger_model_distribution(model_id: String) {
     let next_peer_addr = NEXT_PEER_ADDR.get().cloned().unwrap_or_else(|| "127.0.0.1:50062".to_string());
     
     rt.spawn(async move {
-        // We load Chunk 0 locally
+        // We load Chunk 0 locally since we triggered the distribution
+        let chunk_cell = MY_CHUNK_INDEX.get_or_init(|| std::sync::RwLock::new(None));
+        if let Ok(mut lock) = chunk_cell.write() {
+            *lock = Some(0);
+        }
+        
         emit_model_manifest(format!("{{\"model_id\": \"{}\", \"chunk_index\": 0, \"total_chunks\": {}}}", model_id, total_chunks));
         
         let payload = crate::network::ring::ring_proto::ManifestPayload {

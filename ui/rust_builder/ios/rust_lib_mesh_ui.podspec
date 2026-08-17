@@ -21,7 +21,7 @@ A new Flutter FFI plugin project.
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
   s.platform = :ios, '11.0'
-  s.frameworks = 'SystemConfiguration', 'Security', 'CoreFoundation'
+  s.frameworks = 'SystemConfiguration', 'Security', 'CoreFoundation', 'UIKit'
   s.libraries = 'c++'
 
   # Flutter.framework does not contain a i386 slice.
